@@ -1,0 +1,100 @@
+---
+title: "Practical Machine Learning Project"
+author: "Kripa R"
+date: "December 8, 2017"
+output: html_document
+---
+
+
+# Background Information 
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.
+
+In this project, we will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participant They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. The five ways are exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E). Only Class A corresponds to correct performance. The goal of this project is to predict the manner in which they did the exercise, i.e., Class A to E. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+# Processing & Cleaning the Data
+
+## Import the data 
+First we have to import the data for the training set and the testing set and load the necessary R packages that are needed. 
+```{r}
+
+library(caret); library(rattle); library(rpart); library(rpart.plot)
+library(randomForest); library(repmis)
+
+training_set <- read.csv("pml-training.csv", na.strings = c("NA", ""))
+testing_set <- read.csv("pml-testing.csv", na.strings = c("NA", ""))
+
+```
+
+## Data Cleaning 
+This step is needed in order to delete any predictors in the training set that are missing values as well as removing the predictor which have little predicting power for the outcome. 
+
+```{r}
+training_set<- training_set[, colSums(is.na(training_set))==0]
+testing_set<- testing_set[, colSums(is.na(testing_set))==0]
+
+training_data<-training_set[,-c(1:7)]
+testing_data<- testing_set[,-c(1:7)]
+```
+
+## Data Splitting 
+The training_data, which is the cleaned training set, was split into 70% train_data to be the prediction data and 30% validation_data to act as the validation set in order to compute out of sample error. 
+```{r}
+set.seed(1255)
+
+train<-createDataPartition(y=training_data$classe, p=0.7, list=FALSE)
+train_data<- training_data[train, ]
+validation_data<-training_data[-train, ]
+
+```
+
+
+# Prediction Algorithms
+In this analysis, Classification tree and Random Forest methods will be used. 
+
+## Classsification tree
+This classification tree is using a k-fold cross validation where k=5 in order to cut down on computation time. 
+```{r}
+control <- trainControl(method = "cv", number = 5)
+
+rpart <- train(classe ~ ., data = train_data, method = "rpart", 
+                   trControl = control)
+print(rpart, digits = 4)
+```
+
+```{r}
+fancyRpartPlot(rpart$finalModel, palettes = "Blues")
+```
+
+```{r}
+predict_cf<-predict(rpart,validation_data)
+confirm_cf <- confusionMatrix(validation_data$classe, predict_cf)
+print(confirm_cf)
+accuracy_cf<-confirm_cf$overall[1]
+print(accuracy_cf)
+```
+Using this method, accuracy is made out to be only about 0.495 as well as out of sample error also being around 0.505, thus suggesting a need to try another prediction algorithim that might have better accuracy. 
+
+## Random Forests
+Now we will try to use the Random forest method to better predict the outcomes. 
+```{r}
+random_forest <- train(classe ~ ., data = train_data, method = "rf", 
+                trControl = control)
+print(random_forest, digits = 4)
+
+
+predict_rf<-predict(random_forest,validation_data)
+confirm_rf <- confusionMatrix(validation_data$classe, predict_rf)
+print(confirm_rf)
+accuracy_rf<-confirm_rf$overall[1]
+print(accuracy_rf)
+
+```
+This accuracy of using random forest for this dataset is about 0.994 while the out of sample rate is 0.006. Thus showing that this prediction algorithm might be better suited in this case to use when predicting the outcome of the "classe" variable in the testing set. 
+
+# Prediction of the testing set
+Now we use random forest to predict the outcome of the "classe" variable. 
+```{r}
+(predict(random_forest,testing_data))
+```
+
+
